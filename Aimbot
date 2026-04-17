@@ -1,0 +1,208 @@
+-- Nexis Aimbot - Full Features (Smooth + Wall + Team + Dead Check)
+local player = game.Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+
+local aimbotEnabled = false
+local wallCheck = true
+local teamCheck = true
+local aliveCheck = true
+local fov = 160
+local smoothness = 7
+local aimPart = "Head"  -- Head, HumanoidRootPart, or "Random"
+
+local aimbotConn
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 2
+fovCircle.NumSides = 80
+fovCircle.Color = Color3.fromRGB(0, 255, 100)
+fovCircle.Transparency = 0.65
+fovCircle.Filled = false
+fovCircle.Visible = false
+
+local function isAlive(char)
+    if not aliveCheck then return true end
+    local hum = char:FindFirstChild("Humanoid")
+    return hum and hum.Health > 0
+end
+
+local function isVisible(target)
+    if not wallCheck then return true end
+    local origin = camera.CFrame.Position
+    local direction = (target.Position - origin)
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {player.Character or {}}
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    local result = workspace:Raycast(origin, direction, rayParams)
+    return not (result and result.Instance)
+end
+
+local function getClosestPlayer()
+    local closest = nil
+    local shortest = fov
+    local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+
+    for _, plr in ipairs(game.Players:GetPlayers()) do
+        if plr \~= player and plr.Character and plr.Character:FindFirstChild("Head") then
+            if teamCheck and plr.Team == player.Team then continue end
+            if not isAlive(plr.Character) then continue end
+
+            local part = plr.Character:FindFirstChild(aimPart)
+            if aimPart == "Random" then
+                part = plr.Character:FindFirstChild("Head") or plr.Character:FindFirstChild("HumanoidRootPart")
+            end
+            if not part then continue end
+
+            if not isVisible(part) then continue end
+
+            local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
+            if onScreen then
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                if dist < shortest then
+                    shortest = dist
+                    closest = part
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 240, 0, 340)
+frame.Position = UDim2.new(0, 25, 0.25, 0)
+frame.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
+frame.BorderColor3 = Color3.fromRGB(0, 220, 110)
+frame.BorderSizePixel = 2
+frame.Draggable = true
+frame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 45)
+title.BackgroundTransparency = 1
+title.Text = "Nexis Aimbot"
+title.TextColor3 = Color3.fromRGB(0, 255, 140)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = frame
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0.9, 0, 0, 50)
+toggleBtn.Position = UDim2.new(0.05, 0, 0.18, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+toggleBtn.Text = "AIMBOT OFF"
+toggleBtn.TextColor3 = Color3.new(1,1,1)
+toggleBtn.TextScaled = true
+toggleBtn.Parent = frame
+
+local wallBtn = Instance.new("TextButton")
+wallBtn.Size = UDim2.new(0.9, 0, 0, 42)
+wallBtn.Position = UDim2.new(0.05, 0, 0.38, 0)
+wallBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+wallBtn.Text = "Wall Check: ON"
+wallBtn.TextColor3 = Color3.new(1,1,1)
+wallBtn.TextScaled = true
+wallBtn.Parent = frame
+
+local teamBtn = Instance.new("TextButton")
+teamBtn.Size = UDim2.new(0.9, 0, 0, 42)
+teamBtn.Position = UDim2.new(0.05, 0, 0.52, 0)
+teamBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+teamBtn.Text = "Team Check: ON"
+teamBtn.TextColor3 = Color3.new(1,1,1)
+teamBtn.TextScaled = true
+teamBtn.Parent = frame
+
+local aliveBtn = Instance.new("TextButton")
+aliveBtn.Size = UDim2.new(0.9, 0, 0, 42)
+aliveBtn.Position = UDim2.new(0.05, 0, 0.66, 0)
+aliveBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+aliveBtn.Text = "Dead Check: ON"
+aliveBtn.TextColor3 = Color3.new(1,1,1)
+aliveBtn.TextScaled = true
+aliveBtn.Parent = frame
+
+local partLabel = Instance.new("TextLabel")
+partLabel.Size = UDim2.new(0.9, 0, 0, 30)
+partLabel.Position = UDim2.new(0.05, 0, 0.82, 0)
+partLabel.BackgroundTransparency = 1
+partLabel.Text = "Aim Part: Head"
+partLabel.TextColor3 = Color3.new(1,1,1)
+partLabel.TextScaled = true
+partLabel.Parent = frame
+
+toggleBtn.MouseButton1Click:Connect(function()
+    aimbotEnabled = not aimbotEnabled
+    fovCircle.Visible = aimbotEnabled
+
+    if aimbotEnabled then
+        if aimbotConn then aimbotConn:Disconnect() end
+        aimbotConn = RunService.RenderStepped:Connect(function()
+            local target = getClosestPlayer()
+            if target then
+                local targetPos = target.Position + Vector3.new(0, 1.8, 0)  -- slight head offset
+                local current = camera.CFrame
+                local targetCFrame = CFrame.lookAt(current.Position, targetPos)
+                camera.CFrame = current:Lerp(targetCFrame, 1 / smoothness)
+            end
+        end)
+        toggleBtn.Text = "AIMBOT ON"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+    else
+        if aimbotConn then aimbotConn:Disconnect() end
+        toggleBtn.Text = "AIMBOT OFF"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+    end
+end)
+
+wallBtn.MouseButton1Click:Connect(function()
+    wallCheck = not wallCheck
+    wallBtn.Text = "Wall Check: " .. (wallCheck and "ON" or "OFF")
+    wallBtn.BackgroundColor3 = wallCheck and Color3.fromRGB(0,170,0) or Color3.fromRGB(170,0,0)
+end)
+
+teamBtn.MouseButton1Click:Connect(function()
+    teamCheck = not teamCheck
+    teamBtn.Text = "Team Check: " .. (teamCheck and "ON" or "OFF")
+    teamBtn.BackgroundColor3 = teamCheck and Color3.fromRGB(0,170,0) or Color3.fromRGB(170,0,0)
+end)
+
+aliveBtn.MouseButton1Click:Connect(function()
+    aliveCheck = not aliveCheck
+    aliveBtn.Text = "Dead Check: " .. (aliveCheck and "ON" or "OFF")
+    aliveBtn.BackgroundColor3 = aliveCheck and Color3.fromRGB(0,170,0) or Color3.fromRGB(170,0,0)
+end)
+
+-- Click to cycle aim part
+partLabel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if aimPart == "Head" then
+            aimPart = "HumanoidRootPart"
+            partLabel.Text = "Aim Part: Torso"
+        elseif aimPart == "HumanoidRootPart" then
+            aimPart = "Random"
+            partLabel.Text = "Aim Part: Random"
+        else
+            aimPart = "Head"
+            partLabel.Text = "Aim Part: Head"
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    fovCircle.Radius = fov
+    fovCircle.Position = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+end)
+
+print("✅ Nexis Aimbot loaded with Wall, Team, Dead Check + Smoothness")
+StarterGui:SetCore("SendNotification", {
+    Title = "Nexis Aimbot",
+    Text = "Loaded! Tap AIMBOT OFF to start. Tap labels to change settings.",
+    Duration = 6
+})

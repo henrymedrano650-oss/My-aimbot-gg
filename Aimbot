@@ -1,208 +1,164 @@
--- Nexis Aimbot - Full Features (Smooth + Wall + Team + Dead Check)
+-- Nexis Fly - Fancy Loading + Fancy Key System + Fly
 local player = game.Players.LocalPlayer
 local camera = workspace.CurrentCamera
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
+local TweenService = game:GetService("TweenService")
 
-local aimbotEnabled = false
-local wallCheck = true
-local teamCheck = true
-local aliveCheck = true
-local fov = 160
-local smoothness = 7
-local aimPart = "Head"  -- Head, HumanoidRootPart, or "Random"
+local flying = false
+local bodyVel, bodyGyro
+local noclip = false
+local noclipConn
+local discordLink = "https://discord.gg/4gx6uCGb6h"
 
-local aimbotConn
-local fovCircle = Drawing.new("Circle")
-fovCircle.Thickness = 2
-fovCircle.NumSides = 80
-fovCircle.Color = Color3.fromRGB(0, 255, 100)
-fovCircle.Transparency = 0.65
-fovCircle.Filled = false
-fovCircle.Visible = false
+-- 1. Fancy 10-Second Loading Screen
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.ResetOnSpawn = false
+loadingGui.Parent = player:WaitForChild("PlayerGui")
 
-local function isAlive(char)
-    if not aliveCheck then return true end
-    local hum = char:FindFirstChild("Humanoid")
-    return hum and hum.Health > 0
-end
+local loadFrame = Instance.new("Frame")
+loadFrame.Size = UDim2.new(0, 340, 0, 220)
+loadFrame.Position = UDim2.new(0.5, -170, 0.35, 0)
+loadFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+loadFrame.Parent = loadingGui
 
-local function isVisible(target)
-    if not wallCheck then return true end
-    local origin = camera.CFrame.Position
-    local direction = (target.Position - origin)
-    local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {player.Character or {}}
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    local result = workspace:Raycast(origin, direction, rayParams)
-    return not (result and result.Instance)
-end
-
-local function getClosestPlayer()
-    local closest = nil
-    local shortest = fov
-    local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
-
-    for _, plr in ipairs(game.Players:GetPlayers()) do
-        if plr \~= player and plr.Character and plr.Character:FindFirstChild("Head") then
-            if teamCheck and plr.Team == player.Team then continue end
-            if not isAlive(plr.Character) then continue end
-
-            local part = plr.Character:FindFirstChild(aimPart)
-            if aimPart == "Random" then
-                part = plr.Character:FindFirstChild("Head") or plr.Character:FindFirstChild("HumanoidRootPart")
-            end
-            if not part then continue end
-
-            if not isVisible(part) then continue end
-
-            local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
-            if onScreen then
-                local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                if dist < shortest then
-                    shortest = dist
-                    closest = part
-                end
-            end
-        end
-    end
-    return closest
-end
-
--- GUI
-local screenGui = Instance.new("ScreenGui")
-screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 240, 0, 340)
-frame.Position = UDim2.new(0, 25, 0.25, 0)
-frame.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
-frame.BorderColor3 = Color3.fromRGB(0, 220, 110)
-frame.BorderSizePixel = 2
-frame.Draggable = true
-frame.Parent = screenGui
+Instance.new("UICorner", loadFrame).CornerRadius = UDim.new(0, 16)
+local glow = Instance.new("UIStroke", loadFrame)
+glow.Color = Color3.fromRGB(0, 255, 180)
+glow.Thickness = 3
+glow.Transparency = 0.6
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 45)
+title.Size = UDim2.new(1, 0, 0.28, 0)
 title.BackgroundTransparency = 1
-title.Text = "Nexis Aimbot"
-title.TextColor3 = Color3.fromRGB(0, 255, 140)
+title.Text = "NEXIS"
+title.TextColor3 = Color3.fromRGB(0, 255, 180)
 title.TextScaled = true
-title.Font = Enum.Font.GothamBold
-title.Parent = frame
+title.Font = Enum.Font.GothamBlack
+title.Parent = loadFrame
 
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0.9, 0, 0, 50)
-toggleBtn.Position = UDim2.new(0.05, 0, 0.18, 0)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-toggleBtn.Text = "AIMBOT OFF"
-toggleBtn.TextColor3 = Color3.new(1,1,1)
-toggleBtn.TextScaled = true
-toggleBtn.Parent = frame
+local subtitle = Instance.new("TextLabel")
+subtitle.Size = UDim2.new(1, 0, 0.15, 0)
+subtitle.Position = UDim2.new(0, 0, 0.28, 0)
+subtitle.BackgroundTransparency = 1
+subtitle.Text = "FLY SCRIPT"
+subtitle.TextColor3 = Color3.fromRGB(180, 180, 255)
+subtitle.TextScaled = true
+subtitle.Font = Enum.Font.GothamMedium
+subtitle.Parent = loadFrame
 
-local wallBtn = Instance.new("TextButton")
-wallBtn.Size = UDim2.new(0.9, 0, 0, 42)
-wallBtn.Position = UDim2.new(0.05, 0, 0.38, 0)
-wallBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-wallBtn.Text = "Wall Check: ON"
-wallBtn.TextColor3 = Color3.new(1,1,1)
-wallBtn.TextScaled = true
-wallBtn.Parent = frame
+local progressBar = Instance.new("Frame")
+progressBar.Size = UDim2.new(0.82, 0, 0.09, 0)
+progressBar.Position = UDim2.new(0.09, 0, 0.62, 0)
+progressBar.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+progressBar.Parent = loadFrame
+Instance.new("UICorner", progressBar).CornerRadius = UDim.new(0, 8)
 
-local teamBtn = Instance.new("TextButton")
-teamBtn.Size = UDim2.new(0.9, 0, 0, 42)
-teamBtn.Position = UDim2.new(0.05, 0, 0.52, 0)
-teamBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-teamBtn.Text = "Team Check: ON"
-teamBtn.TextColor3 = Color3.new(1,1,1)
-teamBtn.TextScaled = true
-teamBtn.Parent = frame
+local progressFill = Instance.new("Frame")
+progressFill.Size = UDim2.new(0, 0, 1, 0)
+progressFill.BackgroundColor3 = Color3.fromRGB(0, 255, 180)
+progressFill.Parent = progressBar
+Instance.new("UICorner", progressFill).CornerRadius = UDim.new(0, 8)
 
-local aliveBtn = Instance.new("TextButton")
-aliveBtn.Size = UDim2.new(0.9, 0, 0, 42)
-aliveBtn.Position = UDim2.new(0.05, 0, 0.66, 0)
-aliveBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-aliveBtn.Text = "Dead Check: ON"
-aliveBtn.TextColor3 = Color3.new(1,1,1)
-aliveBtn.TextScaled = true
-aliveBtn.Parent = frame
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, 0, 0.15, 0)
+status.Position = UDim2.new(0, 0, 0.78, 0)
+status.BackgroundTransparency = 1
+status.Text = "Initializing advanced flight system..."
+status.TextColor3 = Color3.fromRGB(200, 200, 220)
+status.TextScaled = true
+status.Font = Enum.Font.Gotham
+status.Parent = loadFrame
 
-local partLabel = Instance.new("TextLabel")
-partLabel.Size = UDim2.new(0.9, 0, 0, 30)
-partLabel.Position = UDim2.new(0.05, 0, 0.82, 0)
-partLabel.BackgroundTransparency = 1
-partLabel.Text = "Aim Part: Head"
-partLabel.TextColor3 = Color3.new(1,1,1)
-partLabel.TextScaled = true
-partLabel.Parent = frame
+-- Loading Animation (10 seconds)
+for i = 1, 100 do
+    progressFill.Size = UDim2.new(i/100, 0, 1, 0)
+    status.Text = "Loading fancy fly module... " .. i .. "%"
+    task.wait(0.1)
+end
 
-toggleBtn.MouseButton1Click:Connect(function()
-    aimbotEnabled = not aimbotEnabled
-    fovCircle.Visible = aimbotEnabled
+status.Text = "Flight systems online ✓"
+task.wait(1.5)
+loadingGui:Destroy()
 
-    if aimbotEnabled then
-        if aimbotConn then aimbotConn:Disconnect() end
-        aimbotConn = RunService.RenderStepped:Connect(function()
-            local target = getClosestPlayer()
-            if target then
-                local targetPos = target.Position + Vector3.new(0, 1.8, 0)  -- slight head offset
-                local current = camera.CFrame
-                local targetCFrame = CFrame.lookAt(current.Position, targetPos)
-                camera.CFrame = current:Lerp(targetCFrame, 1 / smoothness)
-            end
-        end)
-        toggleBtn.Text = "AIMBOT ON"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+-- 2. Fancy Join for Key Screen
+local keyGui = Instance.new("ScreenGui")
+keyGui.ResetOnSpawn = false
+keyGui.Parent = player:WaitForChild("PlayerGui")
+
+local keyFrame = Instance.new("Frame")
+keyFrame.Size = UDim2.new(0, 280, 0, 260)
+keyFrame.Position = UDim2.new(0.5, -140, 0.3, 0)
+keyFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+keyFrame.Parent = keyGui
+Instance.new("UICorner", keyFrame).CornerRadius = UDim.new(0, 16)
+Instance.new("UIStroke", keyFrame).Color = Color3.fromRGB(0, 255, 180)
+
+local keyTitle = Instance.new("TextLabel")
+keyTitle.Size = UDim2.new(1, 0, 0, 50)
+keyTitle.BackgroundTransparency = 1
+keyTitle.Text = "NEXIS FLY"
+keyTitle.TextColor3 = Color3.fromRGB(0, 255, 180)
+keyTitle.TextScaled = true
+keyTitle.Font = Enum.Font.GothamBlack
+keyTitle.Parent = keyFrame
+
+local joinBtn = Instance.new("TextButton")
+joinBtn.Size = UDim2.new(0.88, 0, 0, 55)
+joinBtn.Position = UDim2.new(0.06, 0, 0.28, 0)
+joinBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+joinBtn.Text = "JOIN FOR KEY"
+joinBtn.TextColor3 = Color3.new(1,1,1)
+joinBtn.TextScaled = true
+joinBtn.Font = Enum.Font.GothamBold
+joinBtn.Parent = keyFrame
+Instance.new("UICorner", joinBtn).CornerRadius = UDim.new(0, 12)
+
+local keyBox = Instance.new("TextBox")
+keyBox.Size = UDim2.new(0.88, 0, 0, 50)
+keyBox.Position = UDim2.new(0.06, 0, 0.52, 0)
+keyBox.PlaceholderText = "Enter key here"
+keyBox.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+keyBox.TextColor3 = Color3.new(1,1,1)
+keyBox.TextScaled = true
+keyBox.Parent = keyFrame
+Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 12)
+
+local submitBtn = Instance.new("TextButton")
+submitBtn.Size = UDim2.new(0.88, 0, 0, 50)
+submitBtn.Position = UDim2.new(0.06, 0, 0.72, 0)
+submitBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+submitBtn.Text = "SUBMIT"
+submitBtn.TextColor3 = Color3.new(1,1,1)
+submitBtn.TextScaled = true
+submitBtn.Font = Enum.Font.GothamBold
+submitBtn.Parent = keyFrame
+Instance.new("UICorner", submitBtn).CornerRadius = UDim.new(0, 12)
+
+-- Key Logic
+joinBtn.MouseButton1Click:Connect(function()
+    pcall(function() setclipboard(discordLink) end)
+    StarterGui:SetCore("SendNotification", {Title="Discord Copied", Text="Join and get key: Nexis", Duration=5})
+end)
+
+submitBtn.MouseButton1Click:Connect(function()
+    if keyBox.Text == "Nexis" then
+        keyGui:Destroy()
+        createFlyGUI()
     else
-        if aimbotConn then aimbotConn:Disconnect() end
-        toggleBtn.Text = "AIMBOT OFF"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+        submitBtn.Text = "Wrong Key"
+        submitBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+        task.wait(1.5)
+        submitBtn.Text = "SUBMIT"
+        submitBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
     end
 end)
 
-wallBtn.MouseButton1Click:Connect(function()
-    wallCheck = not wallCheck
-    wallBtn.Text = "Wall Check: " .. (wallCheck and "ON" or "OFF")
-    wallBtn.BackgroundColor3 = wallCheck and Color3.fromRGB(0,170,0) or Color3.fromRGB(170,0,0)
-end)
+-- 3. Fancy Fly GUI + Logic
+function createFlyGUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = player:WaitForChild("PlayerGui")
 
-teamBtn.MouseButton1Click:Connect(function()
-    teamCheck = not teamCheck
-    teamBtn.Text = "Team Check: " .. (teamCheck and "ON" or "OFF")
-    teamBtn.BackgroundColor3 = teamCheck and Color3.fromRGB(0,170,0) or Color3.fromRGB(170,0,0)
-end)
-
-aliveBtn.MouseButton1Click:Connect(function()
-    aliveCheck = not aliveCheck
-    aliveBtn.Text = "Dead Check: " .. (aliveCheck and "ON" or "OFF")
-    aliveBtn.BackgroundColor3 = aliveCheck and Color3.fromRGB(0,170,0) or Color3.fromRGB(170,0,0)
-end)
-
--- Click to cycle aim part
-partLabel.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        if aimPart == "Head" then
-            aimPart = "HumanoidRootPart"
-            partLabel.Text = "Aim Part: Torso"
-        elseif aimPart == "HumanoidRootPart" then
-            aimPart = "Random"
-            partLabel.Text = "Aim Part: Random"
-        else
-            aimPart = "Head"
-            partLabel.Text = "Aim Part: Head"
-        end
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    fovCircle.Radius = fov
-    fovCircle.Position = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
-end)
-
-print("✅ Nexis Aimbot loaded with Wall, Team, Dead Check + Smoothness")
-StarterGui:SetCore("SendNotification", {
-    Title = "Nexis Aimbot",
-    Text = "Loaded! Tap AIMBOT OFF to start. Tap labels to change settings.",
-    Duration = 6
-})
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = U

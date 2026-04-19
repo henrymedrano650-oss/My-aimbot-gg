@@ -16,7 +16,8 @@ gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-Instance.new("BlurEffect", Lighting).Size = 24
+local keyBlur = Instance.new("BlurEffect", Lighting)
+keyBlur.Size = 24
 
 local overlay = Instance.new("Frame", gui)
 overlay.Size = UDim2.new(1,0,1,0)
@@ -40,7 +41,6 @@ grad.Color = ColorSequence.new({
 })
 grad.Rotation = 145
 
--- Top glow bar
 local bar = Instance.new("Frame", frame)
 bar.Size = UDim2.new(1,0,0,3)
 bar.BorderSizePixel = 0
@@ -53,7 +53,6 @@ barGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromRGB(60,210,255)),
 })
 
--- Title
 local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1,0,0,55)
 title.Position = UDim2.new(0,0,0,8)
@@ -79,7 +78,6 @@ sub.Font = Enum.Font.Gotham
 sub.TextColor3 = Color3.fromRGB(150,120,200)
 sub.ZIndex = 3
 
--- Discord button
 local discBtn = Instance.new("TextButton", frame)
 discBtn.Size = UDim2.new(0.8,0,0,34)
 discBtn.Position = UDim2.new(0.1,0,0,90)
@@ -112,7 +110,6 @@ discBtn.MouseButton1Click:Connect(function()
     task.delay(2.5, function() if copiedLbl then copiedLbl.Text = "" end end)
 end)
 
--- Input
 local input = Instance.new("TextBox", frame)
 input.Size = UDim2.new(0.8,0,0,40)
 input.Position = UDim2.new(0.1,0,0,148)
@@ -131,7 +128,6 @@ local iStroke = Instance.new("UIStroke", input)
 iStroke.Color = Color3.fromRGB(120,60,255)
 iStroke.Thickness = 1.5
 
--- Submit
 local submitBtn = Instance.new("TextButton", frame)
 submitBtn.Size = UDim2.new(0.55,0,0,38)
 submitBtn.Position = UDim2.new(0.225,0,0,200)
@@ -180,16 +176,16 @@ submitBtn.MouseButton1Click:Connect(function()
         }):Play()
         TweenService:Create(overlay, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
         task.wait(0.5)
-        for _, v in pairs(Lighting:GetChildren()) do
-            if v:IsA("BlurEffect") then v:Destroy() end
-        end
+        keyBlur:Destroy()
         gui:Destroy()
         keyPassed:Fire()
     else
         statusLbl.Text = "❌  Wrong key! Join Discord to get it."
         input.Text = ""
         shakeFrame()
-        task.delay(3, function() if statusLbl then statusLbl.Text = "" end end)
+        task.delay(3, function()
+            if statusLbl then statusLbl.Text = "" end
+        end)
     end
 end)
 
@@ -199,7 +195,7 @@ end)
 
 keyPassed.Event:Wait()
 
--- ========== LOADING SCREEN ==========
+-- ========== LOADING SCREEN (FIXED) ==========
 local loadGui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
 loadGui.Name = "NexoLoad"
 loadGui.ResetOnSpawn = false
@@ -281,10 +277,12 @@ verTxt.Font = Enum.Font.Gotham
 verTxt.TextColor3 = Color3.fromRGB(90,70,130)
 verTxt.ZIndex = 2
 
-TweenService:Create(logo, TweenInfo.new(0.8,Enum.EasingStyle.Quad), {TextTransparency=0}):Play()
-TweenService:Create(loadSub, TweenInfo.new(0.8,Enum.EasingStyle.Quad), {TextTransparency=0}):Play()
-task.wait(0.6)
+-- Fade in logo and sub
+TweenService:Create(logo, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {TextTransparency = 0}):Play()
+TweenService:Create(loadSub, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {TextTransparency = 0}):Play()
+task.wait(0.8)
 
+-- Loading steps
 local steps = {
     {"⚙️  Loading core modules...",   0.14, 0.7},
     {"🔗  Connecting to services...",  0.28, 0.7},
@@ -297,20 +295,26 @@ local steps = {
 
 for _, s in ipairs(steps) do
     statusTxt.Text = s[1]
-    TweenService:Create(barFill, TweenInfo.new(0.45,Enum.EasingStyle.Quad), {
-        Size = UDim2.new(s[2],0,1,0)
+    TweenService:Create(barFill, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {
+        Size = UDim2.new(s[2], 0, 1, 0)
     }):Play()
     task.wait(s[3])
 end
 
-task.wait(0.4)
-for _, obj in pairs({bg, logo, loadSub, statusTxt, verTxt, barBG}) do
-    TweenService:Create(obj, TweenInfo.new(0.6), {
-        BackgroundTransparency = 1,
-        TextTransparency = 1,
-    }):Play()
-end
-task.wait(0.7)
+-- ✅ FIXED: Wait for bar tween to fully finish before fading out
+task.wait(0.6)
+
+-- Fade out everything individually (fixes stuck screen bug)
+TweenService:Create(logo, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+TweenService:Create(loadSub, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+TweenService:Create(statusTxt, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+TweenService:Create(verTxt, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+task.wait(0.3)
+TweenService:Create(barBG, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+TweenService:Create(barFill, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+task.wait(0.3)
+TweenService:Create(bg, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+task.wait(0.6)
 loadGui:Destroy()
 
 -- ========== CHARACTER ==========
@@ -406,6 +410,14 @@ local function disableInvis()
     origTransparency = {}
 end
 
+local function refreshInvis()
+    if not invisEnabled then return end
+    disableInvis()
+    invisEnabled = true
+    task.wait(0.1)
+    enableInvis()
+end
+
 -- ========== FPS BOOST ==========
 local origLighting = {}
 
@@ -430,9 +442,7 @@ local function applyFPS()
     for _, v in pairs(workspace:GetDescendants()) do
         pcall(function()
             if v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Smoke") or
-               v:IsA("Sparkles") or v:IsA("Beam") or v:IsA("Trail") then
-                v.Enabled = false
-            end
+               v:IsA("Sparkles") or v:IsA("Beam") or v:IsA("Trail") then v.Enabled = false end
         end)
     end
     pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
@@ -448,9 +458,7 @@ local function removeFPS()
     for _, v in pairs(workspace:GetDescendants()) do
         pcall(function()
             if v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Smoke") or
-               v:IsA("Sparkles") or v:IsA("Beam") or v:IsA("Trail") then
-                v.Enabled = true
-            end
+               v:IsA("Sparkles") or v:IsA("Beam") or v:IsA("Trail") then v.Enabled = true end
         end)
     end
     pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic end)
@@ -489,6 +497,11 @@ local function playerInfo(t)
     )
 end
 
+-- ========== NOTIFY HELPER ==========
+local function notify(title, content, dur)
+    Rayfield:Notify({Title = title, Content = content, Duration = dur or 3, Image = 4483362458})
+end
+
 -- ========== MAIN UI ==========
 local Window = Rayfield:CreateWindow({
     Name = "✦ Nexo Hub",
@@ -499,10 +512,6 @@ local Window = Rayfield:CreateWindow({
     DisableRayfieldPrompts = false,
     DisableBuildWarnings = false,
 })
-
-local function notify(title, content, dur)
-    Rayfield:Notify({Title = title, Content = content, Duration = dur or 3, Image = 4483362458})
-end
 
 -- ===== MOVEMENT TAB =====
 local MoveTab = Window:CreateTab("✦ Movement", 4483362458)
@@ -526,7 +535,7 @@ if hasInvisAccess then
 
     MoveTab:CreateToggle({
         Name = "Enable Invisible",
-        Info = "Makes your full character invisible to others",
+        Info = "Makes your full character invisible",
         CurrentValue = false,
         Flag = "InvisToggle",
         Callback = function(v)
@@ -538,13 +547,11 @@ if hasInvisAccess then
 
     MoveTab:CreateButton({
         Name = "🔄 Refresh Invisible",
-        Info = "Re-applies invisible on your current character",
+        Info = "Re-applies invisible — use if parts become visible",
         Callback = function()
             if invisEnabled then
-                disableInvis()
-                task.wait(0.1)
-                enableInvis()
-                notify("✦ Invisible Refreshed", "Invisible re-applied to your character.")
+                refreshInvis()
+                notify("✦ Refreshed", "Invisible re-applied to your character.")
             else
                 notify("✦ Not Active", "Enable invisible first!")
             end
@@ -665,12 +672,13 @@ PerfTab:CreateToggle({
     CurrentValue = false,
     Flag = "FPSBoost",
     Callback = function(v)
-        if v then applyFPS() notify("✦ FPS Boost ON", "All effects removed for max FPS.", 4)
+        if v then applyFPS() notify("✦ FPS Boost ON", "All effects removed.", 4)
         else removeFPS() notify("✦ FPS Boost OFF", "Visuals restored.") end
     end,
 })
 
 PerfTab:CreateSection("🎨 Visual Tweaks")
+
 PerfTab:CreateToggle({
     Name = "Remove Shadows",
     Info = "Disables all shadows",
@@ -747,6 +755,7 @@ PerfTab:CreateSlider({
 -- ===== LOADED =====
 notify(
     "✦ Nexo Hub v3.0",
-    hasInvisAccess and "Early Access! Welcome, " .. LocalPlayer.Name .. " 👻" or "Ready! Welcome, " .. LocalPlayer.Name .. ".",
+    hasInvisAccess and "Early Access! Welcome, " .. LocalPlayer.Name .. " 👻"
+        or "Ready! Welcome, " .. LocalPlayer.Name .. ".",
     6
 )

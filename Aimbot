@@ -1,164 +1,69 @@
--- Nexis Fly - Fancy Loading + Fancy Key System + Fly
-local player = game.Players.LocalPlayer
-local camera = workspace.CurrentCamera
+-- Nexo Script Hub v3.0
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui")
+local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 
-local flying = false
-local bodyVel, bodyGyro
-local noclip = false
-local noclipConn
-local discordLink = "https://discord.gg/4gx6uCGb6h"
+local LocalPlayer = Players.LocalPlayer
 
--- 1. Fancy 10-Second Loading Screen
-local loadingGui = Instance.new("ScreenGui")
-loadingGui.ResetOnSpawn = false
-loadingGui.Parent = player:WaitForChild("PlayerGui")
+-- ========== HELPER: CREATE KEY GUI ==========
+local function createKeyGui(titleText, subtitleText, placeholderText, correctKey, onSuccess)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "NexoKeyGui"
+    gui.ResetOnSpawn = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.IgnoreGuiInset = true
+    gui.Parent = LocalPlayer.PlayerGui
 
-local loadFrame = Instance.new("Frame")
-loadFrame.Size = UDim2.new(0, 340, 0, 220)
-loadFrame.Position = UDim2.new(0.5, -170, 0.35, 0)
-loadFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-loadFrame.Parent = loadingGui
+    local blur = Instance.new("BlurEffect")
+    blur.Size = 24
+    blur.Parent = Lighting
 
-Instance.new("UICorner", loadFrame).CornerRadius = UDim.new(0, 16)
-local glow = Instance.new("UIStroke", loadFrame)
-glow.Color = Color3.fromRGB(0, 255, 180)
-glow.Thickness = 3
-glow.Transparency = 0.6
+    local Overlay = Instance.new("Frame")
+    Overlay.Size = UDim2.new(1, 0, 1, 0)
+    Overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    Overlay.BackgroundTransparency = 0.45
+    Overlay.BorderSizePixel = 0
+    Overlay.ZIndex = 1
+    Overlay.Parent = gui
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0.28, 0)
-title.BackgroundTransparency = 1
-title.Text = "NEXIS"
-title.TextColor3 = Color3.fromRGB(0, 255, 180)
-title.TextScaled = true
-title.Font = Enum.Font.GothamBlack
-title.Parent = loadFrame
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(0, 400, 0, 260)
+    Frame.Position = UDim2.new(0.5, -200, 0.5, -130)
+    Frame.BackgroundColor3 = Color3.fromRGB(10, 8, 20)
+    Frame.BorderSizePixel = 0
+    Frame.ZIndex = 2
+    Frame.Parent = gui
+    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 18)
 
-local subtitle = Instance.new("TextLabel")
-subtitle.Size = UDim2.new(1, 0, 0.15, 0)
-subtitle.Position = UDim2.new(0, 0, 0.28, 0)
-subtitle.BackgroundTransparency = 1
-subtitle.Text = "FLY SCRIPT"
-subtitle.TextColor3 = Color3.fromRGB(180, 180, 255)
-subtitle.TextScaled = true
-subtitle.Font = Enum.Font.GothamMedium
-subtitle.Parent = loadFrame
+    local FrameGrad = Instance.new("UIGradient")
+    FrameGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 12, 50)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(12, 8, 30)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 5, 20)),
+    })
+    FrameGrad.Rotation = 145
+    FrameGrad.Parent = Frame
 
-local progressBar = Instance.new("Frame")
-progressBar.Size = UDim2.new(0.82, 0, 0.09, 0)
-progressBar.Position = UDim2.new(0.09, 0, 0.62, 0)
-progressBar.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
-progressBar.Parent = loadFrame
-Instance.new("UICorner", progressBar).CornerRadius = UDim.new(0, 8)
+    local AccentBar = Instance.new("Frame")
+    AccentBar.Size = UDim2.new(1, 0, 0, 3)
+    AccentBar.BackgroundColor3 = Color3.fromRGB(140, 60, 255)
+    AccentBar.BorderSizePixel = 0
+    AccentBar.ZIndex = 3
+    AccentBar.Parent = Frame
+    Instance.new("UICorner", AccentBar).CornerRadius = UDim.new(0, 18)
+    local AccentGrad = Instance.new("UIGradient", AccentBar)
+    AccentGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 60, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80, 120, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 200, 255)),
+    })
 
-local progressFill = Instance.new("Frame")
-progressFill.Size = UDim2.new(0, 0, 1, 0)
-progressFill.BackgroundColor3 = Color3.fromRGB(0, 255, 180)
-progressFill.Parent = progressBar
-Instance.new("UICorner", progressFill).CornerRadius = UDim.new(0, 8)
-
-local status = Instance.new("TextLabel")
-status.Size = UDim2.new(1, 0, 0.15, 0)
-status.Position = UDim2.new(0, 0, 0.78, 0)
-status.BackgroundTransparency = 1
-status.Text = "Initializing advanced flight system..."
-status.TextColor3 = Color3.fromRGB(200, 200, 220)
-status.TextScaled = true
-status.Font = Enum.Font.Gotham
-status.Parent = loadFrame
-
--- Loading Animation (10 seconds)
-for i = 1, 100 do
-    progressFill.Size = UDim2.new(i/100, 0, 1, 0)
-    status.Text = "Loading fancy fly module... " .. i .. "%"
-    task.wait(0.1)
-end
-
-status.Text = "Flight systems online ✓"
-task.wait(1.5)
-loadingGui:Destroy()
-
--- 2. Fancy Join for Key Screen
-local keyGui = Instance.new("ScreenGui")
-keyGui.ResetOnSpawn = false
-keyGui.Parent = player:WaitForChild("PlayerGui")
-
-local keyFrame = Instance.new("Frame")
-keyFrame.Size = UDim2.new(0, 280, 0, 260)
-keyFrame.Position = UDim2.new(0.5, -140, 0.3, 0)
-keyFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
-keyFrame.Parent = keyGui
-Instance.new("UICorner", keyFrame).CornerRadius = UDim.new(0, 16)
-Instance.new("UIStroke", keyFrame).Color = Color3.fromRGB(0, 255, 180)
-
-local keyTitle = Instance.new("TextLabel")
-keyTitle.Size = UDim2.new(1, 0, 0, 50)
-keyTitle.BackgroundTransparency = 1
-keyTitle.Text = "NEXIS FLY"
-keyTitle.TextColor3 = Color3.fromRGB(0, 255, 180)
-keyTitle.TextScaled = true
-keyTitle.Font = Enum.Font.GothamBlack
-keyTitle.Parent = keyFrame
-
-local joinBtn = Instance.new("TextButton")
-joinBtn.Size = UDim2.new(0.88, 0, 0, 55)
-joinBtn.Position = UDim2.new(0.06, 0, 0.28, 0)
-joinBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
-joinBtn.Text = "JOIN FOR KEY"
-joinBtn.TextColor3 = Color3.new(1,1,1)
-joinBtn.TextScaled = true
-joinBtn.Font = Enum.Font.GothamBold
-joinBtn.Parent = keyFrame
-Instance.new("UICorner", joinBtn).CornerRadius = UDim.new(0, 12)
-
-local keyBox = Instance.new("TextBox")
-keyBox.Size = UDim2.new(0.88, 0, 0, 50)
-keyBox.Position = UDim2.new(0.06, 0, 0.52, 0)
-keyBox.PlaceholderText = "Enter key here"
-keyBox.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-keyBox.TextColor3 = Color3.new(1,1,1)
-keyBox.TextScaled = true
-keyBox.Parent = keyFrame
-Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 12)
-
-local submitBtn = Instance.new("TextButton")
-submitBtn.Size = UDim2.new(0.88, 0, 0, 50)
-submitBtn.Position = UDim2.new(0.06, 0, 0.72, 0)
-submitBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-submitBtn.Text = "SUBMIT"
-submitBtn.TextColor3 = Color3.new(1,1,1)
-submitBtn.TextScaled = true
-submitBtn.Font = Enum.Font.GothamBold
-submitBtn.Parent = keyFrame
-Instance.new("UICorner", submitBtn).CornerRadius = UDim.new(0, 12)
-
--- Key Logic
-joinBtn.MouseButton1Click:Connect(function()
-    pcall(function() setclipboard(discordLink) end)
-    StarterGui:SetCore("SendNotification", {Title="Discord Copied", Text="Join and get key: Nexis", Duration=5})
-end)
-
-submitBtn.MouseButton1Click:Connect(function()
-    if keyBox.Text == "Nexis" then
-        keyGui:Destroy()
-        createFlyGUI()
-    else
-        submitBtn.Text = "Wrong Key"
-        submitBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-        task.wait(1.5)
-        submitBtn.Text = "SUBMIT"
-        submitBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-    end
-end)
-
--- 3. Fancy Fly GUI + Logic
-function createFlyGUI()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = player:WaitForChild("PlayerGui")
-
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = U
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, 0, 0, 52)
+    Title.Position = UDim2.new(0, 0, 0, 10)
+    Title.BackgroundTransparency = 1
+    Title.Text = titleText
+    Title.TextColor3 = Color3.fromRGB(255, 255,

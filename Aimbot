@@ -1,69 +1,752 @@
 -- Nexo Script Hub v3.0
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
-
 local LocalPlayer = Players.LocalPlayer
 
--- ========== HELPER: CREATE KEY GUI ==========
-local function createKeyGui(titleText, subtitleText, placeholderText, correctKey, onSuccess)
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "NexoKeyGui"
-    gui.ResetOnSpawn = false
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.IgnoreGuiInset = true
-    gui.Parent = LocalPlayer.PlayerGui
+-- ========== KEY SYSTEM ==========
+local keyPassed = Instance.new("BindableEvent")
+local enteredKey = nil
 
-    local blur = Instance.new("BlurEffect")
-    blur.Size = 24
-    blur.Parent = Lighting
+local gui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+gui.Name = "NexoKey"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-    local Overlay = Instance.new("Frame")
-    Overlay.Size = UDim2.new(1, 0, 1, 0)
-    Overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    Overlay.BackgroundTransparency = 0.45
-    Overlay.BorderSizePixel = 0
-    Overlay.ZIndex = 1
-    Overlay.Parent = gui
+Instance.new("BlurEffect", Lighting).Size = 24
 
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(0, 400, 0, 260)
-    Frame.Position = UDim2.new(0.5, -200, 0.5, -130)
-    Frame.BackgroundColor3 = Color3.fromRGB(10, 8, 20)
-    Frame.BorderSizePixel = 0
-    Frame.ZIndex = 2
-    Frame.Parent = gui
-    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 18)
+local overlay = Instance.new("Frame", gui)
+overlay.Size = UDim2.new(1,0,1,0)
+overlay.BackgroundColor3 = Color3.fromRGB(0,0,0)
+overlay.BackgroundTransparency = 0.45
+overlay.BorderSizePixel = 0
 
-    local FrameGrad = Instance.new("UIGradient")
-    FrameGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 12, 50)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(12, 8, 30)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 5, 20)),
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0,420,0,280)
+frame.Position = UDim2.new(0.5,-210,0.5,-140)
+frame.BackgroundColor3 = Color3.fromRGB(8,5,18)
+frame.BorderSizePixel = 0
+frame.ZIndex = 2
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0,20)
+
+local grad = Instance.new("UIGradient", frame)
+grad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(30,10,60)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(12,8,30)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(6,4,16)),
+})
+grad.Rotation = 145
+
+-- Top glow bar
+local bar = Instance.new("Frame", frame)
+bar.Size = UDim2.new(1,0,0,3)
+bar.BorderSizePixel = 0
+bar.ZIndex = 3
+Instance.new("UICorner", bar).CornerRadius = UDim.new(0,20)
+local barGrad = Instance.new("UIGradient", bar)
+barGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(160,60,255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80,120,255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(60,210,255)),
+})
+
+-- Title
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,55)
+title.Position = UDim2.new(0,0,0,8)
+title.BackgroundTransparency = 1
+title.Text = "✦ NEXO HUB ✦"
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.ZIndex = 3
+local tGrad = Instance.new("UIGradient", title)
+tGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(210,140,255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(100,190,255)),
+})
+
+local sub = Instance.new("TextLabel", frame)
+sub.Size = UDim2.new(1,0,0,20)
+sub.Position = UDim2.new(0,0,0,62)
+sub.BackgroundTransparency = 1
+sub.Text = "Enter your key to continue"
+sub.TextScaled = true
+sub.Font = Enum.Font.Gotham
+sub.TextColor3 = Color3.fromRGB(150,120,200)
+sub.ZIndex = 3
+
+-- Discord button
+local discBtn = Instance.new("TextButton", frame)
+discBtn.Size = UDim2.new(0.8,0,0,34)
+discBtn.Position = UDim2.new(0.1,0,0,90)
+discBtn.BorderSizePixel = 0
+discBtn.Text = "🔗  Join Discord for Key"
+discBtn.TextScaled = true
+discBtn.Font = Enum.Font.GothamBold
+discBtn.TextColor3 = Color3.fromRGB(255,255,255)
+discBtn.ZIndex = 3
+Instance.new("UICorner", discBtn).CornerRadius = UDim.new(0,10)
+local dGrad = Instance.new("UIGradient", discBtn)
+dGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(110,70,255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(88,101,242)),
+})
+
+local copiedLbl = Instance.new("TextLabel", frame)
+copiedLbl.Size = UDim2.new(0.8,0,0,16)
+copiedLbl.Position = UDim2.new(0.1,0,0,127)
+copiedLbl.BackgroundTransparency = 1
+copiedLbl.Text = ""
+copiedLbl.TextScaled = true
+copiedLbl.Font = Enum.Font.Gotham
+copiedLbl.TextColor3 = Color3.fromRGB(100,255,160)
+copiedLbl.ZIndex = 3
+
+discBtn.MouseButton1Click:Connect(function()
+    setclipboard("https://discord.gg/4gx6uCGb6h")
+    copiedLbl.Text = "✅  Copied! Paste in your browser."
+    task.delay(2.5, function() if copiedLbl then copiedLbl.Text = "" end end)
+end)
+
+-- Input
+local input = Instance.new("TextBox", frame)
+input.Size = UDim2.new(0.8,0,0,40)
+input.Position = UDim2.new(0.1,0,0,148)
+input.BackgroundColor3 = Color3.fromRGB(18,12,35)
+input.TextColor3 = Color3.fromRGB(240,240,255)
+input.PlaceholderText = "🔑  Enter key here..."
+input.PlaceholderColor3 = Color3.fromRGB(100,80,140)
+input.Text = ""
+input.TextScaled = true
+input.Font = Enum.Font.Gotham
+input.BorderSizePixel = 0
+input.ClearTextOnFocus = false
+input.ZIndex = 3
+Instance.new("UICorner", input).CornerRadius = UDim.new(0,10)
+local iStroke = Instance.new("UIStroke", input)
+iStroke.Color = Color3.fromRGB(120,60,255)
+iStroke.Thickness = 1.5
+
+-- Submit
+local submitBtn = Instance.new("TextButton", frame)
+submitBtn.Size = UDim2.new(0.55,0,0,38)
+submitBtn.Position = UDim2.new(0.225,0,0,200)
+submitBtn.BorderSizePixel = 0
+submitBtn.Text = "✦  Submit Key"
+submitBtn.TextScaled = true
+submitBtn.Font = Enum.Font.GothamBold
+submitBtn.TextColor3 = Color3.fromRGB(255,255,255)
+submitBtn.ZIndex = 3
+Instance.new("UICorner", submitBtn).CornerRadius = UDim.new(0,10)
+local sGrad = Instance.new("UIGradient", submitBtn)
+sGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(160,60,255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(70,140,255)),
+})
+
+local statusLbl = Instance.new("TextLabel", frame)
+statusLbl.Size = UDim2.new(1,0,0,20)
+statusLbl.Position = UDim2.new(0,0,1,6)
+statusLbl.BackgroundTransparency = 1
+statusLbl.Text = ""
+statusLbl.TextScaled = true
+statusLbl.Font = Enum.Font.Gotham
+statusLbl.TextColor3 = Color3.fromRGB(255,80,80)
+statusLbl.ZIndex = 3
+
+local function shakeFrame()
+    for i = 1,6 do
+        TweenService:Create(frame, TweenInfo.new(0.05), {
+            Position = UDim2.new(0.5,-210+(i%2==0 and 10 or -10),0.5,-140)
+        }):Play()
+        task.wait(0.05)
+    end
+    TweenService:Create(frame, TweenInfo.new(0.1), {
+        Position = UDim2.new(0.5,-210,0.5,-140)
+    }):Play()
+end
+
+submitBtn.MouseButton1Click:Connect(function()
+    local txt = input.Text
+    if txt == "Nexo" or txt == "TestEarly" then
+        enteredKey = txt
+        TweenService:Create(frame, TweenInfo.new(0.4), {
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0.5,-210,0.6,-140)
+        }):Play()
+        TweenService:Create(overlay, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+        task.wait(0.5)
+        for _, v in pairs(Lighting:GetChildren()) do
+            if v:IsA("BlurEffect") then v:Destroy() end
+        end
+        gui:Destroy()
+        keyPassed:Fire()
+    else
+        statusLbl.Text = "❌  Wrong key! Join Discord to get it."
+        input.Text = ""
+        shakeFrame()
+        task.delay(3, function() if statusLbl then statusLbl.Text = "" end end)
+    end
+end)
+
+input.FocusLost:Connect(function(enter)
+    if enter then submitBtn.MouseButton1Click:Fire() end
+end)
+
+keyPassed.Event:Wait()
+
+-- ========== LOADING SCREEN ==========
+local loadGui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+loadGui.Name = "NexoLoad"
+loadGui.ResetOnSpawn = false
+loadGui.IgnoreGuiInset = true
+
+local bg = Instance.new("Frame", loadGui)
+bg.Size = UDim2.new(1,0,1,0)
+bg.BackgroundColor3 = Color3.fromRGB(6,4,14)
+bg.BorderSizePixel = 0
+local bgGrad = Instance.new("UIGradient", bg)
+bgGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(18,6,40)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(4,3,12)),
+})
+bgGrad.Rotation = 135
+
+local logo = Instance.new("TextLabel", loadGui)
+logo.Size = UDim2.new(0,520,0,95)
+logo.Position = UDim2.new(0.5,-260,0.5,-165)
+logo.BackgroundTransparency = 1
+logo.Text = "✦ NEXO HUB ✦"
+logo.TextScaled = true
+logo.Font = Enum.Font.GothamBold
+logo.TextTransparency = 1
+logo.ZIndex = 2
+local logoGrad = Instance.new("UIGradient", logo)
+logoGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(210,140,255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(80,170,255)),
+})
+
+local loadSub = Instance.new("TextLabel", loadGui)
+loadSub.Size = UDim2.new(0,400,0,28)
+loadSub.Position = UDim2.new(0.5,-200,0.5,-68)
+loadSub.BackgroundTransparency = 1
+loadSub.Text = enteredKey == "TestEarly" and "✦ Early Access  •  v3.0" or "Premium Script Hub  •  v3.0"
+loadSub.TextScaled = true
+loadSub.Font = Enum.Font.Gotham
+loadSub.TextColor3 = Color3.fromRGB(150,120,200)
+loadSub.TextTransparency = 1
+loadSub.ZIndex = 2
+
+local barBG = Instance.new("Frame", loadGui)
+barBG.Size = UDim2.new(0,440,0,6)
+barBG.Position = UDim2.new(0.5,-220,0.5,20)
+barBG.BackgroundColor3 = Color3.fromRGB(28,18,52)
+barBG.BorderSizePixel = 0
+barBG.ZIndex = 2
+Instance.new("UICorner", barBG).CornerRadius = UDim.new(1,0)
+
+local barFill = Instance.new("Frame", barBG)
+barFill.Size = UDim2.new(0,0,1,0)
+barFill.BorderSizePixel = 0
+barFill.ZIndex = 3
+Instance.new("UICorner", barFill).CornerRadius = UDim.new(1,0)
+local bfGrad = Instance.new("UIGradient", barFill)
+bfGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(160,60,255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(60,190,255)),
+})
+
+local statusTxt = Instance.new("TextLabel", loadGui)
+statusTxt.Size = UDim2.new(0,440,0,24)
+statusTxt.Position = UDim2.new(0.5,-220,0.5,36)
+statusTxt.BackgroundTransparency = 1
+statusTxt.Text = "Initializing..."
+statusTxt.TextScaled = true
+statusTxt.Font = Enum.Font.Gotham
+statusTxt.TextColor3 = Color3.fromRGB(160,130,210)
+statusTxt.ZIndex = 2
+
+local verTxt = Instance.new("TextLabel", loadGui)
+verTxt.Size = UDim2.new(0,300,0,20)
+verTxt.Position = UDim2.new(0.5,-150,0.5,78)
+verTxt.BackgroundTransparency = 1
+verTxt.Text = "v3.0  •  Nexo Hub  •  by Nexo"
+verTxt.TextScaled = true
+verTxt.Font = Enum.Font.Gotham
+verTxt.TextColor3 = Color3.fromRGB(90,70,130)
+verTxt.ZIndex = 2
+
+TweenService:Create(logo, TweenInfo.new(0.8,Enum.EasingStyle.Quad), {TextTransparency=0}):Play()
+TweenService:Create(loadSub, TweenInfo.new(0.8,Enum.EasingStyle.Quad), {TextTransparency=0}):Play()
+task.wait(0.6)
+
+local steps = {
+    {"⚙️  Loading core modules...",   0.14, 0.7},
+    {"🔗  Connecting to services...",  0.28, 0.7},
+    {"🔑  Verifying key...",            0.43, 0.6},
+    {"🛠️  Building interface...",       0.58, 0.7},
+    {"⚡  Applying features...",        0.72, 0.6},
+    {"🚀  Optimizing performance...",   0.86, 0.6},
+    {"✦  Welcome to Nexo Hub!",        1.00, 0.5},
+}
+
+for _, s in ipairs(steps) do
+    statusTxt.Text = s[1]
+    TweenService:Create(barFill, TweenInfo.new(0.45,Enum.EasingStyle.Quad), {
+        Size = UDim2.new(s[2],0,1,0)
+    }):Play()
+    task.wait(s[3])
+end
+
+task.wait(0.4)
+for _, obj in pairs({bg, logo, loadSub, statusTxt, verTxt, barBG}) do
+    TweenService:Create(obj, TweenInfo.new(0.6), {
+        BackgroundTransparency = 1,
+        TextTransparency = 1,
+    }):Play()
+end
+task.wait(0.7)
+loadGui:Destroy()
+
+-- ========== CHARACTER ==========
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+local hasInvisAccess = enteredKey == "TestEarly"
+
+-- ========== STATE ==========
+local currentWalkSpeed = 16
+local currentJumpPower = 50
+local noclipEnabled = false
+local invisEnabled = false
+local noclipConn = nil
+local statLoop = nil
+local origCollision = {}
+local origTransparency = {}
+
+-- ========== STAT ENFORCER ==========
+local function startStatLoop()
+    if statLoop then statLoop:Disconnect() end
+    statLoop = RunService.Heartbeat:Connect(function()
+        if not Humanoid or not Humanoid.Parent then return end
+        if Humanoid.WalkSpeed ~= currentWalkSpeed then Humanoid.WalkSpeed = currentWalkSpeed end
+        if Humanoid.JumpPower ~= currentJumpPower then Humanoid.JumpPower = currentJumpPower end
+    end)
+end
+startStatLoop()
+
+-- ========== NOCLIP ==========
+local PARTS = {
+    "HumanoidRootPart","UpperTorso","LowerTorso","Head",
+    "LeftUpperArm","LeftLowerArm","LeftHand",
+    "RightUpperArm","RightLowerArm","RightHand",
+    "LeftUpperLeg","LeftLowerLeg","LeftFoot",
+    "RightUpperLeg","RightLowerLeg","RightFoot",
+    "Torso","Left Arm","Right Arm","Left Leg","Right Leg",
+}
+
+local function enableNoclip()
+    if noclipConn then noclipConn:Disconnect() end
+    origCollision = {}
+    for _, p in pairs(Character:GetDescendants()) do
+        if p:IsA("BasePart") then origCollision[p] = p.CanCollide; p.CanCollide = false end
+    end
+    noclipConn = RunService.Stepped:Connect(function()
+        if not noclipEnabled or not Character then return end
+        for _, n in ipairs(PARTS) do
+            local p = Character:FindFirstChild(n)
+            if p and p:IsA("BasePart") then p.CanCollide = false end
+        end
+        for _, p in pairs(Character:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = false end
+        end
+    end)
+end
+
+local function disableNoclip()
+    noclipEnabled = false
+    if noclipConn then noclipConn:Disconnect() noclipConn = nil end
+    for _, p in pairs(Character:GetDescendants()) do
+        if p:IsA("BasePart") then
+            p.CanCollide = origCollision[p] ~= nil and origCollision[p] or true
+        end
+    end
+    origCollision = {}
+end
+
+-- ========== INVISIBLE ==========
+local function enableInvis()
+    origTransparency = {}
+    if not Character then return end
+    for _, p in pairs(Character:GetDescendants()) do
+        if p:IsA("BasePart") or p:IsA("Decal") then
+            origTransparency[p] = p.Transparency
+            p.Transparency = 1
+        end
+    end
+    for _, acc in pairs(Character:GetChildren()) do
+        if acc:IsA("Accessory") then
+            local h = acc:FindFirstChild("Handle")
+            if h then origTransparency[h] = h.Transparency; h.Transparency = 1 end
+        end
+    end
+end
+
+local function disableInvis()
+    invisEnabled = false
+    if not Character then return end
+    for p, t in pairs(origTransparency) do
+        if p and p.Parent then p.Transparency = t end
+    end
+    origTransparency = {}
+end
+
+-- ========== FPS BOOST ==========
+local origLighting = {}
+
+local function applyFPS()
+    origLighting = {
+        GlobalShadows = Lighting.GlobalShadows,
+        FogEnd = Lighting.FogEnd,
+        Brightness = Lighting.Brightness,
+        Ambient = Lighting.Ambient,
+        OutdoorAmbient = Lighting.OutdoorAmbient,
+    }
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 100000
+    Lighting.Brightness = 1
+    Lighting.Ambient = Color3.fromRGB(128,128,128)
+    Lighting.OutdoorAmbient = Color3.fromRGB(128,128,128)
+    for _, v in pairs(Lighting:GetChildren()) do
+        pcall(function()
+            if v:IsA("PostEffect") or v:IsA("Atmosphere") then v.Enabled = false end
+        end)
+    end
+    for _, v in pairs(workspace:GetDescendants()) do
+        pcall(function()
+            if v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Smoke") or
+               v:IsA("Sparkles") or v:IsA("Beam") or v:IsA("Trail") then
+                v.Enabled = false
+            end
+        end)
+    end
+    pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
+end
+
+local function removeFPS()
+    for k, v in pairs(origLighting) do Lighting[k] = v end
+    for _, v in pairs(Lighting:GetChildren()) do
+        pcall(function()
+            if v:IsA("PostEffect") or v:IsA("Atmosphere") then v.Enabled = true end
+        end)
+    end
+    for _, v in pairs(workspace:GetDescendants()) do
+        pcall(function()
+            if v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Smoke") or
+               v:IsA("Sparkles") or v:IsA("Beam") or v:IsA("Trail") then
+                v.Enabled = true
+            end
+        end)
+    end
+    pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic end)
+end
+
+-- ========== RESPAWN ==========
+LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+    RootPart = char:WaitForChild("HumanoidRootPart")
+    task.wait(0.3)
+    startStatLoop()
+    if noclipEnabled then task.wait(0.1) enableNoclip() end
+    if invisEnabled and hasInvisAccess then task.wait(0.1) enableInvis() end
+end)
+
+-- ========== PLAYER LOOKUP ==========
+local function findPlayer(name)
+    if name == "" then return nil end
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Name:lower():find(name:lower(), 1, true) then return p end
+    end
+    return nil
+end
+
+local function playerInfo(t)
+    local c = t.Character
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    return string.format(
+        "👤 %s  |  %s\n❤️ HP: %s / %s\n🏆 Team: %s\n📅 Age: %s days\n🆔 ID: %s",
+        t.Name, t.DisplayName,
+        h and math.floor(h.Health) or "N/A",
+        h and math.floor(h.MaxHealth) or "N/A",
+        t.Team and t.Team.Name or "None",
+        t.AccountAge, t.UserId
+    )
+end
+
+-- ========== MAIN UI ==========
+local Window = Rayfield:CreateWindow({
+    Name = "✦ Nexo Hub",
+    Icon = 0,
+    LoadingTitle = "✦ Nexo Hub",
+    LoadingSubtitle = "by Nexo  •  v3.0",
+    Theme = "Amethyst",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+})
+
+local function notify(title, content, dur)
+    Rayfield:Notify({Title = title, Content = content, Duration = dur or 3, Image = 4483362458})
+end
+
+-- ===== MOVEMENT TAB =====
+local MoveTab = Window:CreateTab("✦ Movement", 4483362458)
+
+MoveTab:CreateSection("🚫 Noclip")
+MoveTab:CreateToggle({
+    Name = "Enable Noclip",
+    Info = "Phase through every wall and part",
+    CurrentValue = false,
+    Flag = "NoclipToggle",
+    Callback = function(v)
+        noclipEnabled = v
+        if v then enableNoclip() notify("✦ Noclip ON", "Walk through anything.")
+        else disableNoclip() notify("✦ Noclip OFF", "Collision restored.") end
+    end,
+})
+
+-- ===== INVISIBLE (TestEarly only) =====
+if hasInvisAccess then
+    MoveTab:CreateSection("👻 Invisible  —  Early Access")
+
+    MoveTab:CreateToggle({
+        Name = "Enable Invisible",
+        Info = "Makes your full character invisible to others",
+        CurrentValue = false,
+        Flag = "InvisToggle",
+        Callback = function(v)
+            invisEnabled = v
+            if v then enableInvis() notify("✦ Invisible ON", "You are now invisible. 👻")
+            else disableInvis() notify("✦ Invisible OFF", "You are visible again.") end
+        end,
     })
-    FrameGrad.Rotation = 145
-    FrameGrad.Parent = Frame
 
-    local AccentBar = Instance.new("Frame")
-    AccentBar.Size = UDim2.new(1, 0, 0, 3)
-    AccentBar.BackgroundColor3 = Color3.fromRGB(140, 60, 255)
-    AccentBar.BorderSizePixel = 0
-    AccentBar.ZIndex = 3
-    AccentBar.Parent = Frame
-    Instance.new("UICorner", AccentBar).CornerRadius = UDim.new(0, 18)
-    local AccentGrad = Instance.new("UIGradient", AccentBar)
-    AccentGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 60, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80, 120, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 200, 255)),
+    MoveTab:CreateButton({
+        Name = "🔄 Refresh Invisible",
+        Info = "Re-applies invisible on your current character",
+        Callback = function()
+            if invisEnabled then
+                disableInvis()
+                task.wait(0.1)
+                enableInvis()
+                notify("✦ Invisible Refreshed", "Invisible re-applied to your character.")
+            else
+                notify("✦ Not Active", "Enable invisible first!")
+            end
+        end,
     })
 
-    local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, 0, 0, 52)
-    Title.Position = UDim2.new(0, 0, 0, 10)
-    Title.BackgroundTransparency = 1
-    Title.Text = titleText
-    Title.TextColor3 = Color3.fromRGB(255, 255,
+    MoveTab:CreateButton({
+        Name = "👁️ Check Invisible Status",
+        Info = "Shows whether invisible is currently active",
+        Callback = function()
+            notify(
+                "✦ Invisible Status",
+                invisEnabled and "✅ Invisible is ON — you are hidden." or "❌ Invisible is OFF — you are visible."
+            )
+        end,
+    })
+end
+
+-- ===== PLAYER TAB =====
+local PlayerTab = Window:CreateTab("✦ Player", 4483362458)
+
+PlayerTab:CreateSection("⚡ My Stats")
+
+PlayerTab:CreateButton({
+    Name = "📊 Show My Info",
+    Info = "View your current live stats",
+    Callback = function()
+        if not Humanoid then notify("✦ Error", "Character not found!") return end
+        notify("✦ " .. LocalPlayer.Name, string.format(
+            "👤 %s\n❤️ HP: %s / %s\n🚶 Speed: %s\n⬆️ Jump: %s\n📅 Age: %s days",
+            LocalPlayer.Name,
+            math.floor(Humanoid.Health), math.floor(Humanoid.MaxHealth),
+            math.floor(Humanoid.WalkSpeed), math.floor(Humanoid.JumpPower),
+            LocalPlayer.AccountAge
+        ), 7)
+    end,
+})
+
+PlayerTab:CreateSlider({
+    Name = "WalkSpeed",
+    Info = "Locked — game cannot reset this",
+    Range = {16, 800},
+    Increment = 2,
+    Suffix = " SPD",
+    CurrentValue = 16,
+    Flag = "WalkSpeed",
+    Callback = function(v)
+        currentWalkSpeed = v
+        if Humanoid then Humanoid.WalkSpeed = v end
+    end,
+})
+
+PlayerTab:CreateSlider({
+    Name = "JumpPower",
+    Info = "Locked — game cannot reset this",
+    Range = {50, 1000},
+    Increment = 10,
+    Suffix = " JP",
+    CurrentValue = 50,
+    Flag = "JumpPower",
+    Callback = function(v)
+        currentJumpPower = v
+        if Humanoid then Humanoid.JumpPower = v end
+    end,
+})
+
+PlayerTab:CreateButton({
+    Name = "🔄 Reset Stats",
+    Info = "Resets speed and jump to default",
+    Callback = function()
+        currentWalkSpeed = 16
+        currentJumpPower = 50
+        if Humanoid then Humanoid.WalkSpeed = 16 Humanoid.JumpPower = 50 end
+        notify("✦ Reset", "Stats back to default.")
+    end,
+})
+
+PlayerTab:CreateSection("🔍 Player Lookup")
+
+local lookupName = ""
+PlayerTab:CreateInput({
+    Name = "Player Name",
+    Info = "Type a username then press Search",
+    Placeholder = "Username...",
+    Text = "",
+    Callback = function(t) lookupName = t end,
+})
+
+PlayerTab:CreateButton({
+    Name = "🔍 Search Player",
+    Info = "Shows info for the player typed above",
+    Callback = function()
+        if lookupName == "" then notify("✦ Lookup", "❌ Type a name first!") return end
+        local t = findPlayer(lookupName)
+        if t then notify("✦ " .. t.Name, playerInfo(t), 10)
+        else notify("✦ Not Found", "❌ '" .. lookupName .. "' not in server.", 5) end
+    end,
+})
+
+PlayerTab:CreateButton({
+    Name = "📋 List All Players",
+    Info = "Shows everyone in the server",
+    Callback = function()
+        local all = Players:GetPlayers()
+        local lines = {}
+        for i, p in ipairs(all) do lines[i] = i .. ".  " .. p.Name end
+        notify("✦ Server (" .. #all .. " players)", table.concat(lines, "\n"), 9)
+    end,
+})
+
+-- ===== PERFORMANCE TAB =====
+local PerfTab = Window:CreateTab("✦ Performance", 4483362458)
+
+PerfTab:CreateSection("🚀 FPS Booster")
+PerfTab:CreateToggle({
+    Name = "FPS Boost",
+    Info = "Removes all effects for maximum FPS",
+    CurrentValue = false,
+    Flag = "FPSBoost",
+    Callback = function(v)
+        if v then applyFPS() notify("✦ FPS Boost ON", "All effects removed for max FPS.", 4)
+        else removeFPS() notify("✦ FPS Boost OFF", "Visuals restored.") end
+    end,
+})
+
+PerfTab:CreateSection("🎨 Visual Tweaks")
+PerfTab:CreateToggle({
+    Name = "Remove Shadows",
+    Info = "Disables all shadows",
+    CurrentValue = false,
+    Flag = "NoShadows",
+    Callback = function(v) Lighting.GlobalShadows = not v end,
+})
+
+PerfTab:CreateToggle({
+    Name = "Remove Fog",
+    Info = "Removes all fog",
+    CurrentValue = false,
+    Flag = "NoFog",
+    Callback = function(v) Lighting.FogEnd = v and 100000 or 1000 end,
+})
+
+PerfTab:CreateToggle({
+    Name = "Remove Particles",
+    Info = "Disables fire smoke sparkles beams",
+    CurrentValue = false,
+    Flag = "NoParticles",
+    Callback = function(v)
+        for _, obj in pairs(workspace:GetDescendants()) do
+            pcall(function()
+                if obj:IsA("ParticleEmitter") or obj:IsA("Fire") or obj:IsA("Smoke") or
+                   obj:IsA("Sparkles") or obj:IsA("Beam") or obj:IsA("Trail") then
+                    obj.Enabled = not v
+                end
+            end)
+        end
+    end,
+})
+
+PerfTab:CreateToggle({
+    Name = "Remove Post FX",
+    Info = "Disables bloom blur color correction",
+    CurrentValue = false,
+    Flag = "NoPostFX",
+    Callback = function(v)
+        for _, e in pairs(Lighting:GetChildren()) do
+            if e:IsA("PostEffect") then pcall(function() e.Enabled = not v end) end
+        end
+    end,
+})
+
+PerfTab:CreateToggle({
+    Name = "Remove Atmosphere",
+    Info = "Removes sky atmosphere",
+    CurrentValue = false,
+    Flag = "NoAtmosphere",
+    Callback = function(v)
+        for _, e in pairs(Lighting:GetChildren()) do
+            if e:IsA("Atmosphere") then pcall(function() e.Enabled = not v end) end
+        end
+    end,
+})
+
+PerfTab:CreateSlider({
+    Name = "Render Distance",
+    Info = "Lower = more FPS",
+    Range = {64, 2048},
+    Increment = 64,
+    Suffix = " studs",
+    CurrentValue = 512,
+    Flag = "RenderDist",
+    Callback = function(v)
+        pcall(function()
+            workspace.StreamingMinRadius = v / 4
+            workspace.StreamingTargetRadius = v
+        end)
+    end,
+})
+
+-- ===== LOADED =====
+notify(
+    "✦ Nexo Hub v3.0",
+    hasInvisAccess and "Early Access! Welcome, " .. LocalPlayer.Name .. " 👻" or "Ready! Welcome, " .. LocalPlayer.Name .. ".",
+    6
+)
